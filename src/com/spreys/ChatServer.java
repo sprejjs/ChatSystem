@@ -77,7 +77,7 @@ public class ChatServer {
             String message = messageCommand.substring(messageCommand.indexOf(messageSeparator) + messageSeparator.length());
             System.out.println("Incoming message from " + clientName + ". Client Code: " + recipientCode + ". Message: " + message);
 
-            sendMessageToTheClient(message, Integer.valueOf(recipientCode) - 1);
+            sendMessageToTheClient(message, Integer.valueOf(recipientCode));
 
             return "Message delivered \n";
         }
@@ -87,7 +87,7 @@ public class ChatServer {
 
             try {
                 PrintWriter outToClient = new PrintWriter(new OutputStreamWriter(client.connectionSocket.getOutputStream()));
-                outToClient.println(message);
+                outToClient.println("INCOMING||" + clientId + "|" + message);
                 outToClient.flush();
 
             } catch (Exception ex) {
@@ -104,7 +104,7 @@ public class ChatServer {
 
             String output = "CLIENTS||";
             for (int i = 0; i < clients.size(); i++) {
-                output += String.valueOf(i+1) + "|" + clients.get(i).clientName + "|";
+                output += String.valueOf(i) + "|" + clients.get(i).clientName + "|";
             }
 
             return output + "\n";

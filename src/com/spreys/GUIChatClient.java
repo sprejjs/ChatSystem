@@ -17,6 +17,7 @@ public class GUIChatClient {
     Socket socket = null;
     private static final String COMMAND_SEPARATOR = "||";
     private static final String COMMAND_CLIENTS_LIST = "CLIENTS";
+    private static final String COMMAND_INCOMING_MESSAGE = "INCOMING";
     private static final String COMMAND_CLIENTS_SEPARATOR = "|";
     private List<User> users = new ArrayList<>();
 
@@ -81,6 +82,22 @@ public class GUIChatClient {
                             displayClients(users);
                             loginPanel.setVisible(false);
                             messasagingPannel.setVisible(true);
+                        }
+
+                        if(code.equals(COMMAND_INCOMING_MESSAGE)) {
+                            String rowMessage = serverSentence
+                                    .substring(serverSentence.indexOf(COMMAND_SEPARATOR) + COMMAND_SEPARATOR.length());
+
+                            int clientId = Integer.valueOf(
+                                    rowMessage.substring(0, rowMessage.indexOf(COMMAND_CLIENTS_SEPARATOR))
+                            );
+                            String text = rowMessage.substring(
+                                    rowMessage.indexOf(COMMAND_CLIENTS_SEPARATOR) + COMMAND_CLIENTS_SEPARATOR.length()
+                            );
+
+                            Message incomingMessage = new Message(true, text);
+                            users.get(clientId).addMessage(incomingMessage);
+                            displayChat();
                         }
                     }
                 } catch (Exception ex) {
