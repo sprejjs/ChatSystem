@@ -102,12 +102,12 @@ public class ChatServer {
 
             System.out.println("Client connected. Client name is: " + clientName);
 
-            String output = "Welcome " + clientName + "! You can chat to: \n";
+            String output = "CLIENTS||";
             for (int i = 0; i < clients.size(); i++) {
-                output += String.valueOf(i+1) + ". " + clients.get(i).clientName + "\n";
+                output += String.valueOf(i+1) + "|" + clients.get(i).clientName + "|";
             }
 
-            return output;
+            return output + "\n";
         }
     }
 }
