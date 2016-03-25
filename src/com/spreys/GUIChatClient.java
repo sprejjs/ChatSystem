@@ -6,6 +6,8 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.*;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,10 +51,15 @@ public class GUIChatClient {
     }
 
     private void register(String name) {
-        //Listen to messages from the server
-        ServerResponseReader serverResponseReader = new ServerResponseReader();
+        //Listen to TCP messages from the server
+        ServerTCPResponseReader serverResponseReader = new ServerTCPResponseReader();
         Thread responseThread = new Thread(serverResponseReader);
         responseThread.start();
+
+        //Listen to UDP messages from the server
+        ServerUDPResponseReader serverUDPResponseReader = new ServerUDPResponseReader();
+        Thread udpResponseThread = new Thread(serverUDPResponseReader);
+        udpResponseThread.start();
 
         try {
             SendToServer("REGISTER||" + name);
@@ -62,7 +69,30 @@ public class GUIChatClient {
 
     }
 
-    private class ServerResponseReader implements Runnable {
+    private class ServerUDPResponseReader implements Runnable {
+
+        @Override
+        public void run() {
+            try {
+                DatagramSocket clientSocket = new DatagramSocket(9878);
+                byte[] receivedData = new byte[1024];
+
+                while (true) {
+                    DatagramPacket receivedPacket = new DatagramPacket(receivedData, receivedData.length);
+                    clientSocket.receive(receivedPacket);
+
+                    String message = new String(receivedPacket.getData());
+
+                    parseServerResponse(message);
+                }
+
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+
+    private class ServerTCPResponseReader implements Runnable {
 
         @Override
         public void run() {
@@ -71,39 +101,42 @@ public class GUIChatClient {
                     BufferedReader inFromServer = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                     String serverSentence;
                     while ((serverSentence = inFromServer.readLine()) != null) {
-
-                        String code = serverSentence.substring(0, serverSentence.indexOf(COMMAND_SEPARATOR));
-
-                        if(code.equals(COMMAND_CLIENTS_LIST)) {
-                            String rowListOfClients = serverSentence
-                                    .substring(serverSentence.indexOf(COMMAND_SEPARATOR) + COMMAND_SEPARATOR.length());
-
-                            users = parseClients(rowListOfClients);
-                            displayClients(users);
-                            loginPanel.setVisible(false);
-                            messasagingPannel.setVisible(true);
-                        }
-
-                        if(code.equals(COMMAND_INCOMING_MESSAGE)) {
-                            String rowMessage = serverSentence
-                                    .substring(serverSentence.indexOf(COMMAND_SEPARATOR) + COMMAND_SEPARATOR.length());
-
-                            int clientId = Integer.valueOf(
-                                    rowMessage.substring(0, rowMessage.indexOf(COMMAND_CLIENTS_SEPARATOR))
-                            );
-                            String text = rowMessage.substring(
-                                    rowMessage.indexOf(COMMAND_CLIENTS_SEPARATOR) + COMMAND_CLIENTS_SEPARATOR.length()
-                            );
-
-                            Message incomingMessage = new Message(true, text);
-                            users.get(clientId).addMessage(incomingMessage);
-                            displayChat();
-                        }
+                        parseServerResponse(serverSentence);
                     }
                 } catch (Exception ex) {
                     System.out.println(ex.getMessage());
                 }
             } while (true);
+        }
+    }
+
+    private void parseServerResponse(String response) {
+        String code = response.substring(0, response.indexOf(COMMAND_SEPARATOR));
+
+        if(code.equals(COMMAND_CLIENTS_LIST)) {
+            String rowListOfClients = response
+                    .substring(response.indexOf(COMMAND_SEPARATOR) + COMMAND_SEPARATOR.length());
+
+            users = parseClients(rowListOfClients);
+            displayClients(users);
+            loginPanel.setVisible(false);
+            messasagingPannel.setVisible(true);
+        }
+
+        if(code.equals(COMMAND_INCOMING_MESSAGE)) {
+            String rowMessage = response
+                    .substring(response.indexOf(COMMAND_SEPARATOR) + COMMAND_SEPARATOR.length());
+
+            int clientId = Integer.valueOf(
+                    rowMessage.substring(0, rowMessage.indexOf(COMMAND_CLIENTS_SEPARATOR))
+            );
+            String text = rowMessage.substring(
+                    rowMessage.indexOf(COMMAND_CLIENTS_SEPARATOR) + COMMAND_CLIENTS_SEPARATOR.length()
+            );
+
+            Message incomingMessage = new Message(true, text);
+            users.get(clientId).addMessage(incomingMessage);
+            displayChat();
         }
     }
 

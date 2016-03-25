@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -53,23 +55,25 @@ public class ChatServer {
                     String code = clientSentence.substring(0, clientSentence.indexOf(commandSeparator));
 
                     //Process the command
-                    String response = "";
+                    String response = null;
                     if(code.equals("REGISTER")) {
-                        response = register(clientSentence);
+                        register(clientSentence);
                     }
 
                     if(code.equals("MESSAGE")){
-                        response = processMessage(clientSentence);
+                        processMessage(clientSentence);
                     }
 
                     //Return the response back to the client
-                    outToClient.print(response);
-                    outToClient.flush();
+                    if(response != null) {
+                        outToClient.print(response);
+                        outToClient.flush();
+                    }
                 }
             }catch(Exception e){}
         }
 
-        private String processMessage(String messageCommand) {
+        private void processMessage(String messageCommand) {
             String recipientCode = messageCommand.substring(
                     messageCommand.indexOf(commandSeparator) + commandSeparator.length(),
                     messageCommand.indexOf(messageSeparator)
@@ -78,8 +82,6 @@ public class ChatServer {
             System.out.println("Incoming message from " + clientName + ". Client Code: " + recipientCode + ". Message: " + message);
 
             sendMessageToTheClient(message, Integer.valueOf(recipientCode));
-
-            return "Message delivered \n";
         }
 
         private void sendMessageToTheClient(String message, int clientId) {
@@ -93,21 +95,41 @@ public class ChatServer {
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
-
-
         }
 
-        private String register(String registrationCommand) {
+        private void register(String registrationCommand) {
             clientName = registrationCommand.substring(registrationCommand.indexOf(commandSeparator) + commandSeparator.length());
 
             System.out.println("Client connected. Client name is: " + clientName);
+            sendClientsList();
+        }
 
+        private void sendClientsList() {
             String output = "CLIENTS||";
             for (int i = 0; i < clients.size(); i++) {
                 output += String.valueOf(i) + "|" + clients.get(i).clientName + "|";
             }
 
-            return output + "\n";
+            try {
+
+                for(Connection connection : clients) {
+                    byte[] sendData = output.getBytes();
+
+                    Socket socket = connection.connectionSocket;
+
+                    DatagramPacket sendPacket = new DatagramPacket(
+                            sendData,
+                            sendData.length,
+                            socket.getInetAddress(),
+                            socket.getPort());
+                    DatagramSocket serverSocket = new DatagramSocket();
+                    serverSocket.send(sendPacket);
+                }
+
+
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
     }
 }
