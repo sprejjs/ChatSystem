@@ -219,6 +219,9 @@ public class GUIChatClient {
                     String message = messageTextField.getText();
                     users.get(index).addMessage(new Message(false, message));
                     SendToServer("MESSAGE||" + users.get(index).getId() + ":|:" + message);
+
+                    //Clear the message field
+                    messageTextField.setText("");
                     displayChat();
                 } catch (Exception ex) {
                     ex.printStackTrace();
