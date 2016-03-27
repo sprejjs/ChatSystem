@@ -8,6 +8,7 @@ import java.awt.event.MouseEvent;
 import java.io.*;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,16 +17,18 @@ import java.util.List;
  * Created by vspreys on 25/03/16.
  */
 public class GUIChatClient {
-    Socket socket = null;
+    Socket tcpSocket = null;
+    DatagramSocket udpSocket;
     private static final String COMMAND_SEPARATOR = "||";
+    private static final String COMMAND_CLIENTS_SEPARATOR = "|";
     private static final String COMMAND_CLIENTS_LIST = "CLIENTS";
     private static final String COMMAND_INCOMING_MESSAGE = "INCOMING";
-    private static final String COMMAND_CLIENTS_SEPARATOR = "|";
+    private static final String COMMAND_TCP_REGISTRATION_SUCCESS = "TCP_REG_SUCCESS";
     private List<User> users = new ArrayList<>();
 
     private JPanel rootPanel;
     private JTextField serverAddressTextField;
-    private JTextField serverPortTextField;
+    private JTextField serverTcpPortTextField;
     private JTextField usernameTextField;
     private JButton loginButton;
     private JLabel serverAddressLabel;
@@ -37,6 +40,7 @@ public class GUIChatClient {
     private JTextField messageTextField;
     private JButton sendButton;
     private JList messagesList;
+    private JTextField serverUdpPortTextField;
 
     public static void main(String[] args) throws Exception {
         GUIChatClient client = new GUIChatClient();
@@ -50,23 +54,35 @@ public class GUIChatClient {
         client.messasagingPannel.setVisible(false);
     }
 
-    private void register(String name) {
+    private void registerTcp(String name) throws Exception {
+        tcpSocket = new Socket(serverAddressTextField.getText(), Integer.valueOf(serverTcpPortTextField.getText()));
         //Listen to TCP messages from the server
         ServerTCPResponseReader serverResponseReader = new ServerTCPResponseReader();
         Thread responseThread = new Thread(serverResponseReader);
         responseThread.start();
 
+        try {
+            SendToServer("TCP_REGISTER||" + name);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    private void registerUdp(int connectionId) throws Exception {
+        udpSocket = new DatagramSocket();
+
+        int serverPort = Integer.valueOf(serverUdpPortTextField.getText());
+        InetAddress inetAddress = InetAddress.getByName(serverAddressTextField.getText());
+
+        byte[] message = ("UDP_REGISTER" + COMMAND_SEPARATOR + String.valueOf(connectionId)).getBytes();
+
+        DatagramPacket sendPacket = new DatagramPacket(message, message.length, inetAddress, serverPort);
+        udpSocket.send(sendPacket);
+
         //Listen to UDP messages from the server
         ServerUDPResponseReader serverUDPResponseReader = new ServerUDPResponseReader();
         Thread udpResponseThread = new Thread(serverUDPResponseReader);
         udpResponseThread.start();
-
-        try {
-            SendToServer("REGISTER||" + name);
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
-
     }
 
     private class ServerUDPResponseReader implements Runnable {
@@ -74,12 +90,11 @@ public class GUIChatClient {
         @Override
         public void run() {
             try {
-                DatagramSocket clientSocket = new DatagramSocket(9878);
                 byte[] receivedData = new byte[1024];
 
                 while (true) {
                     DatagramPacket receivedPacket = new DatagramPacket(receivedData, receivedData.length);
-                    clientSocket.receive(receivedPacket);
+                    udpSocket.receive(receivedPacket);
 
                     String message = new String(receivedPacket.getData());
 
@@ -98,7 +113,7 @@ public class GUIChatClient {
         public void run() {
             do {
                 try {
-                    BufferedReader inFromServer = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                    BufferedReader inFromServer = new BufferedReader(new InputStreamReader(tcpSocket.getInputStream()));
                     String serverSentence;
                     while ((serverSentence = inFromServer.readLine()) != null) {
                         parseServerResponse(serverSentence);
@@ -113,20 +128,16 @@ public class GUIChatClient {
     private void parseServerResponse(String response) {
         String code = response.substring(0, response.indexOf(COMMAND_SEPARATOR));
 
-        if(code.equals(COMMAND_CLIENTS_LIST)) {
-            String rowListOfClients = response
-                    .substring(response.indexOf(COMMAND_SEPARATOR) + COMMAND_SEPARATOR.length());
+        String rowMessage = response.substring(response.indexOf(COMMAND_SEPARATOR) + COMMAND_SEPARATOR.length());
 
-            users = parseClients(rowListOfClients);
+        if(code.equals(COMMAND_CLIENTS_LIST)) {
+            users = parseClients(rowMessage);
             displayClients(users);
             loginPanel.setVisible(false);
             messasagingPannel.setVisible(true);
         }
 
         if(code.equals(COMMAND_INCOMING_MESSAGE)) {
-            String rowMessage = response
-                    .substring(response.indexOf(COMMAND_SEPARATOR) + COMMAND_SEPARATOR.length());
-
             int clientId = Integer.valueOf(
                     rowMessage.substring(0, rowMessage.indexOf(COMMAND_CLIENTS_SEPARATOR))
             );
@@ -137,6 +148,16 @@ public class GUIChatClient {
             Message incomingMessage = new Message(true, text);
             users.get(clientId).addMessage(incomingMessage);
             displayChat();
+        }
+
+        if(code.equals(COMMAND_TCP_REGISTRATION_SUCCESS)) {
+            //Make a UDP connection to the server
+            int connectionId = Integer.valueOf(rowMessage);
+            try {
+                registerUdp(connectionId);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
     }
 
@@ -176,8 +197,7 @@ public class GUIChatClient {
             @Override
             public void actionPerformed(ActionEvent e) {
                 try {
-                    socket = new Socket(serverAddressTextField.getText(), Integer.valueOf(serverPortTextField.getText()));
-                    register(usernameTextField.getText());
+                    registerTcp(usernameTextField.getText());
                 } catch (Exception ex) {
                     ex.printStackTrace();
                 }
@@ -223,7 +243,7 @@ public class GUIChatClient {
 
     void SendToServer(String msg) throws Exception{
         //create output stream attached to socket
-        PrintWriter outToServer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
+        PrintWriter outToServer = new PrintWriter(new OutputStreamWriter(tcpSocket.getOutputStream()));
         //send msg to server
         outToServer.print(msg + '\n');
         outToServer.flush();
