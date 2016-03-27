@@ -19,6 +19,7 @@ import java.util.List;
 public class GUIChatClient {
     Socket tcpSocket = null;
     DatagramSocket udpSocket;
+    private int identifier;
     private static final String COMMAND_SEPARATOR = "||";
     private static final String COMMAND_CLIENTS_SEPARATOR = "|";
     private static final String COMMAND_CLIENTS_LIST = "CLIENTS";
@@ -130,6 +131,8 @@ public class GUIChatClient {
 
         String rowMessage = response.substring(response.indexOf(COMMAND_SEPARATOR) + COMMAND_SEPARATOR.length());
 
+        System.out.println(response);
+
         if(code.equals(COMMAND_CLIENTS_LIST)) {
             users = parseClients(rowMessage);
             displayClients(users);
@@ -146,15 +149,19 @@ public class GUIChatClient {
             );
 
             Message incomingMessage = new Message(true, text);
-            users.get(clientId).addMessage(incomingMessage);
+            for (User user : users) {
+                if (user.getId() == clientId) {
+                    user.addMessage(incomingMessage);
+                }
+            }
             displayChat();
         }
 
         if(code.equals(COMMAND_TCP_REGISTRATION_SUCCESS)) {
             //Make a UDP connection to the server
-            int connectionId = Integer.valueOf(rowMessage);
+            identifier = Integer.valueOf(rowMessage);
             try {
-                registerUdp(connectionId);
+                registerUdp(identifier);
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -186,7 +193,7 @@ public class GUIChatClient {
         DefaultListModel model = new DefaultListModel();
 
         for (User user : users) {
-            model.addElement(user.getUsername());
+            model.addElement(user.getUsername() + "[" + user.getId() + "]");
         }
 
         clientsList.setModel(model);
@@ -208,10 +215,10 @@ public class GUIChatClient {
             @Override
             public void actionPerformed(ActionEvent e) {
                 try {
-                    int clientNumber = clientsList.getSelectedIndex();
+                    int index = clientsList.getSelectedIndex();
                     String message = messageTextField.getText();
-                    users.get(clientNumber).addMessage(new Message(false, message));
-                    SendToServer("MESSAGE||" + clientNumber + ":|:" + message);
+                    users.get(index).addMessage(new Message(false, message));
+                    SendToServer("MESSAGE||" + users.get(index).getId() + ":|:" + message);
                     displayChat();
                 } catch (Exception ex) {
                     ex.printStackTrace();

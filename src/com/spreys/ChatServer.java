@@ -131,15 +131,17 @@ public class ChatServer {
         }
 
         private void sendMessageToTheClient(String message, int clientId) {
-            Connection client = clients.get(clientId);
+            for (Connection client : clients) {
+                if (client.identifier == clientId) {
+                    try {
+                        PrintWriter outToClient = new PrintWriter(new OutputStreamWriter(client.tcpSocket.getOutputStream()));
+                        outToClient.println("INCOMING||" + identifier + "|" + message);
+                        outToClient.flush();
 
-            try {
-                PrintWriter outToClient = new PrintWriter(new OutputStreamWriter(client.tcpSocket.getOutputStream()));
-                outToClient.println("INCOMING||" + clientId + "|" + message);
-                outToClient.flush();
-
-            } catch (Exception ex) {
-                ex.printStackTrace();
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                }
             }
         }
 
@@ -158,8 +160,9 @@ public class ChatServer {
 
     private void sendClientsList() {
         String output = "CLIENTS||";
-        for (int i = 0; i < clients.size(); i++) {
-            output += String.valueOf(i) + "|" + clients.get(i).clientName + "|";
+
+        for (Connection connection : clients) {
+            output += connection.identifier + "|" + connection.clientName + "|";
         }
 
         try {
