@@ -17,9 +17,8 @@ import java.util.List;
  * Created by vspreys on 25/03/16.
  */
 public class GUIChatClient {
-    Socket tcpSocket = null;
-    DatagramSocket udpSocket;
-    private int identifier;
+    private Socket tcpSocket = null;
+    private DatagramSocket udpSocket;
     private static final String COMMAND_SEPARATOR = "||";
     private static final String COMMAND_CLIENTS_SEPARATOR = "|";
     private static final String COMMAND_CLIENTS_LIST = "CLIENTS";
@@ -159,7 +158,7 @@ public class GUIChatClient {
 
         if(code.equals(COMMAND_TCP_REGISTRATION_SUCCESS)) {
             //Make a UDP connection to the server
-            identifier = Integer.valueOf(rowMessage);
+            int identifier = Integer.valueOf(rowMessage);
             try {
                 registerUdp(identifier);
             } catch (Exception ex) {
